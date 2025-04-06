@@ -1,0 +1,57 @@
+﻿<Application x:Class="TODO.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:TODO"
+             xmlns:viewModel="clr-namespace:TODO.MVVM.ViewModel"
+             xmlns:view="clr-namespace:TODO.MVVM.View"
+             StartupUri="MainWindow.xaml">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!-- Button Themes -->
+                <ResourceDictionary Source="/Themes/ButtonThemes/ActionButton.xaml"/>
+                <ResourceDictionary Source="/Themes/ButtonThemes/DropdownButton.xaml"/>
+                <ResourceDictionary Source="/Themes/ButtonThemes/MenuButtonTheme.xaml"/>
+                <ResourceDictionary Source="/Themes/ButtonThemes/SettingsDropdown.xaml"/>
+                <ResourceDictionary Source="/Themes/ButtonThemes/InvisibleButton.xaml"/>
+                <ResourceDictionary Source="/Themes/ButtonThemes/DatePickerButton.xaml"/>
+                <ResourceDictionary Source="/Themes/ButtonThemes/EditButtons.xaml"/>
+                
+
+                <!-- Border Themes -->
+                <ResourceDictionary Source="/Themes/BorderThemes/DropdownSettingsBorder.xaml"/>
+
+                <!-- SVG Geometries -->
+                <ResourceDictionary Source="/Themes/SVG/SVGGeometries.xaml"/>
+
+                <!-- CheckBox Themes -->
+                <ResourceDictionary Source="/Themes/CheckBoxThemes/ModernCheckBox.xaml"/>
+
+                <!-- ScrollBar Styles -->
+                <ResourceDictionary Source="/Themes/ScrollBarStyles/ScrollBarStyles.xaml"/>
+
+                <!-- Card Themes -->
+                <ResourceDictionary Source="/Themes/CardThemes/TodoCard.xaml"/>
+
+                <!-- Textbox Themes -->
+                <ResourceDictionary Source="/Themes/TextboxThemes/TextboxTheme.xaml"/>
+                <ResourceDictionary Source="/Themes/TextboxThemes/EditTextboxTheme.xaml"/>
+                
+                <!-- ComboBox Themes -->
+                <ResourceDictionary Source="/Themes/ComboBoxThemes/EditComboBoxTheme.xaml"/>
+
+                <!-- DatePicker Themes -->
+                <ResourceDictionary Source="/Themes/DatePickerThemes/EditDatePickerTheme.xaml"/>
+
+                <!-- Color Themes -->
+                <ResourceDictionary Source="/Themes/ColorThemes/PriorityColors.xaml"/>
+                <ResourceDictionary Source="/Themes/ColorThemes/DarkTheme.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+
+            <DataTemplate DataType="{x:Type viewModel:HomeViewModel}">
+                <view:HomeView/>
+            </DataTemplate>
+
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>
