@@ -29,14 +29,29 @@ jobs:
       - name: Build the application
         run: dotnet build ${{ env.PROJECT_PATH }} -c Release --no-restore
   
-      - name: Publish the executable
-        run: dotnet publish ${{ env.PROJECT_PATH }} -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true --no-build -o publish_output
+      - name: Publish the application (Full Release)
+        run: |
+          dotnet publish ${{ env.PROJECT_PATH }} \
+            -c Release \
+            -r win-x64 \
+            --self-contained true \
+            -p:PublishSingleFile=false \
+            -p:IncludeAllContentForSelfExtract=false \
+            -p:EnableCompressionInSingleFile=true \
+            --no-build \
+            -o publish_output
 
-      - name: Upload artifact (Executable)
+      - name: Zip the output
+        run: |
+          Compress-Archive -Path publish_output/* -DestinationPath TODO_Release.zip -Force
+
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: todo-app-executable
-          path: publish_output/*.exe
+          name: todo-app-release
+          path: |
+            publish_output
+            TODO_Release.zip
 
   tag-and-release:
     needs: deploy
@@ -89,14 +104,16 @@ jobs:
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
-          name: todo-app-executable
-          path: publish_output
+          name: todo-app-release
+          path: release_files
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ env.TAG_NAME }}
           name: ${{ env.TAG_NAME }}
-          files: publish_output/*.exe
+          files: |
+            release_files/TODO_Release.zip
+            release_files/publish_output/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
