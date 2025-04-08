@@ -88,22 +88,12 @@ jobs:
       - name: Update version and create tag
         if: env.SKIP_RELEASE == 'false'
         run: |
-          # Checkout properly to a branch
-          git checkout -b version-update-$NEW_VERSION
-          
-          # Update version
           sed -i "s/<Version>.*<\/Version>/<Version>$NEW_VERSION<\/Version>/" ${{ env.PROJECT_PATH }}
-          
-          # Configure git
           git config --global user.email "actions@github.com"
           git config --global user.name "GitHub Actions"
-          
-          # Commit and push
           git add ${{ env.PROJECT_PATH }}
           git commit -m "Bump version to $NEW_VERSION [skip ci]"
-          git push origin version-update-$NEW_VERSION
-          
-          # Create and push tag
+          git push
           git tag $TAG_NAME
           git push origin $TAG_NAME
 
