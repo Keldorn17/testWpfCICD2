@@ -15,29 +15,33 @@ jobs:
       pull-requests: write
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
 
-      - name: Get version branch name
-        id: get-branch
+      - name: Find version-update branch
+        id: find_branch
         run: |
-          # Get all remote branches
+          # Fetch all remote branches
           git fetch --all
-          # Find the newest version-update branch
+          # Find the most recent version-update branch
           BRANCH_NAME=$(git branch -r | grep 'origin/version-update-' | sort -r | head -1 | sed 's/origin\///' | tr -d ' ')
           echo "branch_name=${BRANCH_NAME}" >> $GITHUB_OUTPUT
           echo "Found branch: ${BRANCH_NAME}"
 
       - name: Create Pull Request
-        if: steps.get-branch.outputs.branch_name != ''
+        if: steps.find_branch.outputs.branch_name != ''
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          branch: ${{ steps.get-branch.outputs.branch_name }}
+          path: .
+          branch: ${{ steps.find_branch.outputs.branch_name }}
           base: main
           title: "Version bump $(date +'%Y-%m-%d')"
           body: "Automated version update"
           labels: "automated"
+          commit-message: "Version bump $(date +'%Y-%m-%d')"
+          delete-branch: false
           draft: false
