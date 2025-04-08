@@ -10,7 +10,6 @@ on:
 
 env:
   PROJECT_PATH: TODO.csproj
-  GH_TOKEN: ${{ github.token }}  # Required for GitHub CLI
 
 jobs:
   verify-build:
@@ -80,12 +79,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Setup GitHub CLI
-        run: |
-          gh auth setup-git
-          gh auth status
+          token: ${{ secrets.GITHUB_TOKEN }}  # Needed for branch deletion
 
       - name: Get current version
         id: get_version
@@ -106,21 +100,19 @@ jobs:
           echo "TAG_NAME=todo/v$NEW_VERSION" >> $GITHUB_ENV
           echo "TEMP_BRANCH=version-update-$NEW_VERSION" >> $GITHUB_ENV
 
-      - name: Update version and create release
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Update version and create tag
         run: |
+          # Create temporary branch
+          git checkout -b $TEMP_BRANCH
+          
+          # Update version
+          sed -i "s/<Version>.*<\/Version>/<Version>$NEW_VERSION<\/Version>/" ${{ env.PROJECT_PATH }}
+          
           # Configure git
           git config --global user.email "actions@github.com"
           git config --global user.name "GitHub Actions"
           
-          # Create temporary branch
-          git checkout -b $TEMP_BRANCH
-          
-          # Update version in .csproj
-          sed -i "s/<Version>.*<\/Version>/<Version>$NEW_VERSION<\/Version>/" ${{ env.PROJECT_PATH }}
-          
-          # Commit version bump
+          # Commit and push
           git add ${{ env.PROJECT_PATH }}
           git commit -m "Bump version to $NEW_VERSION [skip ci]"
           git push origin $TEMP_BRANCH
@@ -128,29 +120,6 @@ jobs:
           # Create and push tag
           git tag $TAG_NAME
           git push origin $TAG_NAME
-          
-          # Create PR
-          PR_URL=$(gh pr create \
-            --head $TEMP_BRANCH \
-            --base main \
-            --title "Version bump to $NEW_VERSION" \
-            --body "Automated version update for release $TAG_NAME" \
-            --label automated)
-          
-          echo "PR_URL=${PR_URL}" >> $GITHUB_ENV
-
-      - name: Approve and merge PR
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          # Extract PR number from URL
-          PR_NUMBER=$(echo "$PR_URL" | awk -F'/' '{print $NF}')
-          
-          # Approve the PR
-          gh pr review $PR_NUMBER --approve --body "Automatically approved by release workflow"
-          
-          # Merge the PR
-          gh pr merge $PR_NUMBER --merge --delete-branch
 
       - name: Download artifact
         uses: actions/download-artifact@v4
@@ -166,3 +135,12 @@ jobs:
           files: release/TODO_Release.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Delete temporary branch
+        run: |
+          # Delete remote branch
+          git push origin --delete $TEMP_BRANCH
+          
+          # Delete local branch
+          git checkout main
+          git branch -D $TEMP_BRANCH
