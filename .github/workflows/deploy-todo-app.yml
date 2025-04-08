@@ -123,10 +123,6 @@ jobs:
             --base main \
             --head version-update-$NEW_VERSION
           
-          # Enable auto-merge
-          PR_NUMBER=$(gh pr list --head version-update-$NEW_VERSION --json number -q '.[0].number')
-          gh pr merge $PR_NUMBER --auto --squash
-          
           # Create and push tag (doesn't require main branch access)
           git tag $TAG_NAME
           git push origin $TAG_NAME
