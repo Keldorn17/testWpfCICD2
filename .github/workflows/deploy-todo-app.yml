@@ -50,9 +50,21 @@ jobs:
 
   create-release:
     needs: deploy
-    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      checks: write
     steps:
+      - name: Install GitHub CLI
+        run: |
+          type -p curl >/dev/null || (sudo apt update && sudo apt install curl -y)
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+          && sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+          && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+          && sudo apt update \
+          && sudo apt install gh -y
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -85,15 +97,37 @@ jobs:
             echo "SKIP_RELEASE=false" >> $GITHUB_ENV
           fi
 
-      - name: Update version and create tag
+      - name: Update version and create auto-merge PR
         if: env.SKIP_RELEASE == 'false'
         run: |
+          # Create new branch
+          git checkout -b version-update-$NEW_VERSION
+          
+          # Update version
           sed -i "s/<Version>.*<\/Version>/<Version>$NEW_VERSION<\/Version>/" ${{ env.PROJECT_PATH }}
+          
+          # Configure git
           git config --global user.email "actions@github.com"
           git config --global user.name "GitHub Actions"
+          
+          # Commit changes
           git add ${{ env.PROJECT_PATH }}
           git commit -m "Bump version to $NEW_VERSION [skip ci]"
-          git push
+          git push origin version-update-$NEW_VERSION
+          
+          # Create PR using GitHub CLI
+          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+          gh pr create \
+            --title "Version bump to $NEW_VERSION" \
+            --body "Automated version bump" \
+            --base main \
+            --head version-update-$NEW_VERSION
+          
+          # Enable auto-merge
+          PR_NUMBER=$(gh pr list --head version-update-$NEW_VERSION --json number -q '.[0].number')
+          gh pr merge $PR_NUMBER --auto --squash
+          
+          # Create and push tag (doesn't require main branch access)
           git tag $TAG_NAME
           git push origin $TAG_NAME
 
