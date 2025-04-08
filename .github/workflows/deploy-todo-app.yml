@@ -10,6 +10,7 @@ on:
 
 env:
   PROJECT_PATH: TODO.csproj
+  GH_TOKEN: ${{ github.token }}  # Required for GitHub CLI
 
 jobs:
   verify-build:
@@ -81,6 +82,11 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Setup GitHub CLI
+        run: |
+          gh auth setup-git
+          gh auth status
+
       - name: Get current version
         id: get_version
         run: |
@@ -101,6 +107,8 @@ jobs:
           echo "TEMP_BRANCH=version-update-$NEW_VERSION" >> $GITHUB_ENV
 
       - name: Update version and create release
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           # Configure git
           git config --global user.email "actions@github.com"
@@ -127,15 +135,16 @@ jobs:
             --base main \
             --title "Version bump to $NEW_VERSION" \
             --body "Automated version update for release $TAG_NAME" \
-            --label automated \
-            | grep -o 'https://github.com/.*/pull/[0-9]*')
+            --label automated)
           
-          echo "PR_URL=$PR_URL" >> $GITHUB_ENV
+          echo "PR_URL=${PR_URL}" >> $GITHUB_ENV
 
       - name: Approve and merge PR
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           # Extract PR number from URL
-          PR_NUMBER=$(echo $PR_URL | awk -F'/' '{print $7}')
+          PR_NUMBER=$(echo "$PR_URL" | awk -F'/' '{print $NF}')
           
           # Approve the PR
           gh pr review $PR_NUMBER --approve --body "Automatically approved by release workflow"
