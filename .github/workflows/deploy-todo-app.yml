@@ -12,7 +12,31 @@ env:
   PROJECT_PATH: TODO.csproj
 
 jobs:
+  validate-project:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate project file
+        run: |
+          # Check for XML syntax errors
+          if Select-String -Path ${{ env.PROJECT_PATH }} -Pattern "[^\x09\x0A\x0D\x20-\xFF]" -Quiet; then
+            Write-Error "Project file contains invalid characters"
+            exit 1
+          fi
+          
+          # Basic XML validation
+          try {
+            [xml](Get-Content ${{ env.PROJECT_PATH }})
+            Write-Output "Project file is valid XML"
+          } catch {
+            Write-Error "Invalid XML in project file: $_"
+            exit 1
+          }
+
   deploy:
+    needs: validate-project
     runs-on: windows-latest
     steps:
       - name: Checkout repository
@@ -24,12 +48,17 @@ jobs:
           dotnet-version: '8.0.x'
 
       - name: Restore dependencies
-        run: dotnet restore ${{ env.PROJECT_PATH }} -r win-x64
-  
+        run: |
+          # First try without RID
+          dotnet restore ${{ env.PROJECT_PATH }} || (
+            echo "Standard restore failed, trying with win-x64..."
+            dotnet restore ${{ env.PROJECT_PATH }} -r win-x64
+          )
+
       - name: Build the application
         run: dotnet build ${{ env.PROJECT_PATH }} -c Release --no-restore
   
-      - name: Publish application (Fixed Runtime)
+      - name: Publish application
         run: |
           dotnet publish ${{ env.PROJECT_PATH }} `
             -c Release `
@@ -37,24 +66,20 @@ jobs:
             --self-contained true `
             -p:PublishSingleFile=false `
             -p:IncludeNativeLibrariesForSelfExtract=true `
-            -p:IncludeAllContentForSelfExtract=true `
-            -p:EnableCompressionInSingleFile=true `
             --no-build `
             -o publish_output
 
-      - name: Verify runtime files
+      - name: Verify output
         run: |
-          dir publish_output\runtimes\win-x64\native
-          dir publish_output\*.dll
+          if (!(Test-Path "publish_output\*.exe")) {
+            Write-Error "No executable found in publish output!"
+            Get-ChildItem -Path publish_output -Recurse
+            exit 1
+          }
 
       - name: Create release ZIP
         run: |
-          $compress = @{
-            Path = "publish_output/*"
-            DestinationPath = "TODO_Release.zip"
-            CompressionLevel = "Optimal"
-          }
-          Compress-Archive @compress -Force
+          Compress-Archive -Path publish_output\* -DestinationPath TODO_Release.zip -Force
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
