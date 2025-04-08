@@ -30,7 +30,7 @@ jobs:
               run: dotnet build ${{ env.PROJECT_PATH }} -c Release --no-restore
   
             - name: Publish the executable
-              run: dotnet publish ${{ env.PROJECT_PATH }} -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false --no-build -o publish_output
+              run: dotnet publish ${{ env.PROJECT_PATH }} -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true --no-build -o publish_output
 
             - name: Upload artifact (Executable)
               uses: actions/upload-artifact@v4
@@ -45,19 +45,21 @@ jobs:
       steps:
         - name: Checkout repository
           uses: actions/checkout@v2
-
-        - name: Download artifact
-          uses: actions/download-artifact@v4
           with:
-            name: todo-app-executable
-            path: publish_output
+            fetch-depth: 0
 
-        - name: Generate new tag
+        - name: Get version from project file
+          id: get_version
+          run: |
+            VERSION=$(grep '<Version>' ${{ env.PROJECT_PATH }} | sed -E 's/.*<Version>(.*)<\/Version>.*/\1/')
+            echo "Current version: $VERSION"
+            echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+        - name: Generate tag
           id: tag
           run: |
-            VERSION=$(date +'%Y.%m.%d-%H%M%S')
-            echo "New tag: todo-app/v$VERSION"
-            echo "TAG_NAME=todo-app/v$VERSION" >> $GITHUB_ENV
+            echo "New tag: todo/v$VERSION"
+            echo "TAG_NAME=todo/v$VERSION" >> $GITHUB_ENV
 
         - name: Push the new tag
           run: |
@@ -74,4 +76,3 @@ jobs:
             files: publish_output/*.exe
           env:
             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
