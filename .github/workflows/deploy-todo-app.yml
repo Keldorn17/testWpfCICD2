@@ -20,18 +20,19 @@ jobs:
 
       - name: Validate project file
         run: |
-          # Check for XML syntax errors
-          if Select-String -Path ${{ env.PROJECT_PATH }} -Pattern "[^\x09\x0A\x0D\x20-\xFF]" -Quiet; then
-            Write-Error "Project file contains invalid characters"
+          # Check if file exists
+          if (-not (Test-Path ${{ env.PROJECT_PATH }})) {
+            Write-Error "Project file not found at ${{ env.PROJECT_PATH }}"
             exit 1
-          fi
+          }
           
-          # Basic XML validation
+          # Simple XML validation
           try {
-            [xml](Get-Content ${{ env.PROJECT_PATH }})
+            [xml]$proj = Get-Content ${{ env.PROJECT_PATH }}
             Write-Output "Project file is valid XML"
           } catch {
             Write-Error "Invalid XML in project file: $_"
+            Write-Output "Problem likely at line $($_.Exception.LineNumber)"
             exit 1
           }
 
@@ -48,13 +49,8 @@ jobs:
           dotnet-version: '8.0.x'
 
       - name: Restore dependencies
-        run: |
-          # First try without RID
-          dotnet restore ${{ env.PROJECT_PATH }} || (
-            echo "Standard restore failed, trying with win-x64..."
-            dotnet restore ${{ env.PROJECT_PATH }} -r win-x64
-          )
-
+        run: dotnet restore ${{ env.PROJECT_PATH }} -r win-x64
+  
       - name: Build the application
         run: dotnet build ${{ env.PROJECT_PATH }} -c Release --no-restore
   
@@ -71,11 +67,13 @@ jobs:
 
       - name: Verify output
         run: |
-          if (!(Test-Path "publish_output\*.exe")) {
+          $exe = Get-ChildItem -Path publish_output -Filter *.exe -File
+          if (-not $exe) {
             Write-Error "No executable found in publish output!"
             Get-ChildItem -Path publish_output -Recurse
             exit 1
           }
+          Write-Output "Found executable: $($exe.FullName)"
 
       - name: Create release ZIP
         run: |
