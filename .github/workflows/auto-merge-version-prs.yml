@@ -2,7 +2,7 @@ name: "Auto-Approve Version PRs"
 
 on:
   pull_request:
-    types: [opened, reopened]
+    types: [opened, reopened, synchronize]
     branches: [main]
 
 jobs:
@@ -12,31 +12,51 @@ jobs:
     permissions:
       pull-requests: write
       contents: write
+      checks: write
 
     steps:
+      - name: Debug PR info
+        run: |
+          echo "PR Number: ${{ github.event.pull_request.number }}"
+          echo "Head Ref: ${{ github.event.pull_request.head.ref }}"
+          echo "Base Ref: ${{ github.event.pull_request.base.ref }}"
+          echo "Node ID: ${{ github.event.pull_request.node_id }}"
+
       - name: Approve PR
         uses: actions/github-script@v7
         with:
           script: |
-            github.rest.pulls.createReview({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.payload.pull_request.number,
-              event: 'APPROVE',
-              body: 'Automatically approved: Version bump'
-            })
+            try {
+              await github.rest.pulls.createReview({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.payload.pull_request.number,
+                event: 'APPROVE',
+                body: 'Automatically approved: Version bump'
+              })
+              console.log('PR approved successfully')
+            } catch (error) {
+              console.error('Approval failed:', error)
+              core.setFailed(error.message)
+            }
 
       - name: Enable auto-merge
         uses: actions/github-script@v7
         with:
           script: |
-            github.graphql(`
-              mutation {
-                enablePullRequestAutoMerge(input: {
-                  pullRequestId: context.payload.pull_request.node_id,
-                  mergeMethod: SQUASH
-                }) {
-                  clientMutationId
+            try {
+              await github.graphql(`
+                mutation {
+                  enablePullRequestAutoMerge(input: {
+                    pullRequestId: "${{ github.event.pull_request.node_id }}",
+                    mergeMethod: SQUASH
+                  }) {
+                    clientMutationId
+                  }
                 }
-              }
-            `)
+              `)
+              console.log('Auto-merge enabled successfully')
+            } catch (error) {
+              console.error('Auto-merge failed:', error)
+              core.setFailed(error.message)
+            }
