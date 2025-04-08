@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
 
 env:
   PROJECT_PATH: TODO.csproj
@@ -21,7 +18,7 @@ jobs:
       - name: Setup .NET 8
         uses: actions/setup-dotnet@v3
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: '8.0.x'
 
       - name: Restore dependencies
         run: dotnet restore ${{ env.PROJECT_PATH }} -r win-x64
@@ -29,7 +26,7 @@ jobs:
       - name: Build the application
         run: dotnet build ${{ env.PROJECT_PATH }} -c Release --no-restore
   
-      - name: Publish the application (Full Release)
+      - name: Publish application
         run: |
           dotnet publish ${{ env.PROJECT_PATH }} `
             -c Release `
@@ -37,25 +34,26 @@ jobs:
             --self-contained true `
             -p:PublishSingleFile=false `
             -p:IncludeAllContentForSelfExtract=false `
-            -p:EnableCompressionInSingleFile=true `
             --no-build `
             -o publish_output
 
-      - name: Zip the output
+      - name: Create release ZIP
         run: |
-          Compress-Archive -Path publish_output\* -DestinationPath TODO_Release.zip -Force
+          $compress = @{
+            Path = "publish_output/*"
+            DestinationPath = "TODO_Release.zip"
+            CompressionLevel = "Optimal"
+          }
+          Compress-Archive @compress -Force
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: todo-app-release
-          path: |
-            publish_output
-            TODO_Release.zip
+          name: release-package
+          path: TODO_Release.zip
 
-  tag-and-release:
+  create-release:
     needs: deploy
-    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -63,57 +61,32 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Get current version
+      - name: Get version
         id: get_version
         run: |
-          CURRENT_VERSION=$(grep '<Version>' ${{ env.PROJECT_PATH }} | sed -E 's/.*<Version>(.*)<\/Version>.*/\1/')
-          echo "Current version: $CURRENT_VERSION"
-          echo "CURRENT_VERSION=$CURRENT_VERSION" >> $GITHUB_ENV
-
-      - name: Calculate new version
-        id: bump_version
-        run: |
-          IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
-          MAJOR=${VERSION_PARTS[0]}
-          MINOR=${VERSION_PARTS[1]}
-          PATCH=${VERSION_PARTS[2]}
-          
-          NEW_PATCH=$((PATCH + 1))
-          NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
-          
-          echo "New version: $NEW_VERSION"
-          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
-
-      - name: Update project version
-        run: |
-          sed -i "s/<Version>.*<\/Version>/<Version>$NEW_VERSION<\/Version>/" ${{ env.PROJECT_PATH }}
-          git config --global user.email "actions@github.com"
-          git config --global user.name "GitHub Actions"
-          git add ${{ env.PROJECT_PATH }}
-          git commit -m "Bump version to $NEW_VERSION [skip ci]"
-          git push
+          VERSION=$(grep '<Version>' ${{ env.PROJECT_PATH }} | sed -E 's/.*<Version>(.*)<\/Version>.*/\1/')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "TAG_NAME=todo/v$VERSION" >> $GITHUB_ENV
 
       - name: Create tag
         run: |
-          TAG_NAME="todo/v$NEW_VERSION"
-          echo "Creating tag: $TAG_NAME"
+          git config --global user.email "actions@github.com"
+          git config --global user.name "GitHub Actions"
           git tag $TAG_NAME
           git push origin $TAG_NAME
-          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
 
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
-          name: todo-app-release
-          path: release_files
+          name: release-package
+          path: release
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.TAG_NAME }}
-          name: ${{ env.TAG_NAME }}
+          name: "Release ${{ env.TAG_NAME }}"
           files: |
-            release_files/TODO_Release.zip
-            release_files/publish_output/*
+            release/TODO_Release.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
