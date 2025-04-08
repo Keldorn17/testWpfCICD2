@@ -2,16 +2,15 @@ name: "PR Validation"
 
 on:
   pull_request:
-    branches:
-      - main
-    branches-ignore:
-      - 'version-update-*'
+    types: [opened, synchronize, reopened]
+    branches: [main]
 
 env:
   PROJECT_PATH: TODO.csproj
 
 jobs:
   validate:
+    if: ${{ !startsWith(github.event.pull_request.head.ref, 'version-update-') }}
     runs-on: windows-latest
     steps:
       - name: Checkout repository
