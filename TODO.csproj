@@ -7,8 +7,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
 	  <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+<<<<<<< HEAD
     <SelfContained>true</SelfContained>
     <Version>1.0.2</Version>
+=======
+    <Version>1.0.3</Version>
+>>>>>>> 676acc4f8dafe9d448017baa920b588381758091
   </PropertyGroup>
 
   <ItemGroup>
