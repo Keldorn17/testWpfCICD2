@@ -1,0 +1,43 @@
+name: "Auto-Create Version PR"
+
+on:
+  workflow_run:
+    workflows: ["Deploy Todo App"]
+    types:
+      - completed
+
+jobs:
+  create-version-pr:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version branch name
+        id: get-branch
+        run: |
+          # Get all remote branches
+          git fetch --all
+          # Find the newest version-update branch
+          BRANCH_NAME=$(git branch -r | grep 'origin/version-update-' | sort -r | head -1 | sed 's/origin\///' | tr -d ' ')
+          echo "branch_name=${BRANCH_NAME}" >> $GITHUB_OUTPUT
+          echo "Found branch: ${BRANCH_NAME}"
+
+      - name: Create Pull Request
+        if: steps.get-branch.outputs.branch_name != ''
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ steps.get-branch.outputs.branch_name }}
+          base: main
+          title: "Version bump $(date +'%Y-%m-%d')"
+          body: "Automated version update"
+          labels: "automated"
+          draft: false

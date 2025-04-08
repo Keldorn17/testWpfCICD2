@@ -1,71 +1,42 @@
-name: "Auto-Merge Version PRs"
+name: "Auto-Approve Version PRs"
 
 on:
-  workflow_run:
-    workflows: ["Deploy Todo App"]
-    types:
-      - completed
+  pull_request:
+    types: [opened, reopened]
+    branches: [main]
 
 jobs:
-  handle-version-pr:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+  approve-and-merge:
+    if: startsWith(github.event.pull_request.head.ref, 'version-update-')
     runs-on: ubuntu-latest
     permissions:
-      contents: write
       pull-requests: write
-      checks: write
+      contents: write
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          ref: main
-          fetch-depth: 0
-
-      - name: Install GitHub CLI
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y curl
-          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-          sudo apt-get update
-          sudo apt-get install -y gh
-
-      - name: Find version-update branch
-        id: find_branch
-        run: |
-          # Get branches from remote
-          git fetch --all
-          # Find most recent version-update branch
-          BRANCH_NAME=$(git branch -r | grep 'origin/version-update-' | sort -r | head -1 | sed 's/origin\///' | xargs)
-          echo "branch_name=${BRANCH_NAME}" >> $GITHUB_OUTPUT
-          echo "Found branch: ${BRANCH_NAME}"
-
-      - name: Create PR
-        if: steps.find_branch.outputs.branch_name != ''
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
-          gh pr create \
-            --title "Version bump ${{ env.NEW_VERSION }}" \
-            --head "${{ steps.find_branch.outputs.branch_name }}" \
-            --base main \
-            --body "Automated version bump PR"
-
-      - name: Get PR number
-        if: steps.find_branch.outputs.branch_name != ''
-        id: get_pr_number
-        run: |
-          PR_NUMBER=$(gh pr list --head "${{ steps.find_branch.outputs.branch_name }}" --json number -q '.[0].number')
-          echo "pr_number=${PR_NUMBER}" >> $GITHUB_OUTPUT
-
       - name: Approve PR
-        if: steps.get_pr_number.outputs.pr_number != ''
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
-          gh pr review ${{ steps.get_pr_number.outputs.pr_number }} --approve --body "Automatically approved"
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.pulls.createReview({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              event: 'APPROVE',
+              body: 'Automatically approved: Version bump'
+            })
 
       - name: Enable auto-merge
-        if: steps.get_pr_number.outputs.pr_number != ''
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
-          gh pr merge ${{ steps.get_pr_number.outputs.pr_number }} --auto --squash
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.graphql(`
+              mutation {
+                enablePullRequestAutoMerge(input: {
+                  pullRequestId: context.payload.pull_request.node_id,
+                  mergeMethod: SQUASH
+                }) {
+                  clientMutationId
+                }
+              }
+            `)
