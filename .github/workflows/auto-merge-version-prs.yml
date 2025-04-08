@@ -1,41 +1,71 @@
 name: "Auto-Merge Version PRs"
 
 on:
-  pull_request:
-    types: [opened, reopened, synchronize]
-    branches: [main]
+  workflow_run:
+    workflows: ["Deploy Todo App"]
+    types:
+      - completed
 
 jobs:
-  approve-and-merge:
-    if: startsWith(github.event.pull_request.head.ref, 'version-update-')
+  handle-version-pr:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
       pull-requests: write
-    
+      checks: write
+
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: main
 
-      - name: Auto-approve PR
+      - name: Find version-update branch
+        id: find_branch
         run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
-          gh pr review ${{ github.event.pull_request.number }} --approve --body "Automatically approved: Version bump"
+          # Get the most recent version-update branch
+          BRANCH_NAME=$(git branch -r | grep 'origin/version-update-' | sort -r | head -1 | sed 's/origin\///' | xargs)
+          echo "branch_name=${BRANCH_NAME}" >> $GITHUB_OUTPUT
 
-      - name: Enable auto-merge
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
-          gh pr merge ${{ github.event.pull_request.number }} --auto --squash
-
-      - name: Check mergeability status
+      - name: Create PR
+        id: create_pr
         uses: actions/github-script@v6
         with:
           script: |
-            const { data: pr } = await github.rest.pulls.get({
+            const { data: pr } = await github.rest.pulls.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              pull_number: ${{ github.event.pull_request.number }}
+              title: `Version bump ${process.env.NEW_VERSION}`,
+              head: '${{ steps.find_branch.outputs.branch_name }}',
+              base: 'main',
+              body: 'Automated version bump PR'
             });
-            if (pr.mergeable_state !== 'clean') {
-              core.setFailed(`PR not ready to merge. Status: ${pr.mergeable_state}`);
-            }
+            return pr.number;
+
+      - name: Approve PR
+        uses: actions/github-script@v6
+        with:
+          script: |
+            await github.rest.pulls.createReview({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: ${{ steps.create_pr.outputs.result }},
+              event: 'APPROVE',
+              body: 'Automatically approved by version bump workflow'
+            })
+
+      - name: Enable auto-merge
+        uses: actions/github-script@v6
+        with:
+          script: |
+            await github.graphql(`
+              mutation {
+                enablePullRequestAutoMerge(input: {
+                  pullRequestId: "${{ github.event.pull_request.node_id }}",
+                  mergeMethod: SQUASH
+                }) {
+                  clientMutationId
+                }
+              }
+            `)
