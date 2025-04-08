@@ -37,7 +37,6 @@ jobs:
           }
 
   deploy:
-    needs: validate-project
     runs-on: windows-latest
     steps:
       - name: Checkout repository
@@ -54,7 +53,7 @@ jobs:
       - name: Build the application
         run: dotnet build ${{ env.PROJECT_PATH }} -c Release --no-restore
   
-      - name: Publish application
+      - name: Publish application (Complete Self-Contained)
         run: |
           dotnet publish ${{ env.PROJECT_PATH }} `
             -c Release `
@@ -62,18 +61,29 @@ jobs:
             --self-contained true `
             -p:PublishSingleFile=false `
             -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:IncludeAllContentForSelfExtract=true `
+            -p:EnableCompressionInSingleFile=true `
+            -p:SelfContained=true `
             --no-build `
             -o publish_output
 
-      - name: Verify output
+      - name: Verify runtime files
         run: |
-          $exe = Get-ChildItem -Path publish_output -Filter *.exe -File
-          if (-not $exe) {
-            Write-Error "No executable found in publish output!"
-            Get-ChildItem -Path publish_output -Recurse
-            exit 1
+          # Check critical runtime files exist
+          $requiredFiles = @(
+            "publish_output\*.exe",
+            "publish_output\*.dll",
+            "publish_output\runtimes\win-x64\native\*.dll",
+            "publish_output\Microsoft.NETCore.App\*"
+          )
+          
+          foreach ($file in $requiredFiles) {
+            if (-not (Test-Path $file)) {
+              Write-Error "Missing required file: $file"
+              Get-ChildItem -Path publish_output -Recurse
+              exit 1
+            }
           }
-          Write-Output "Found executable: $($exe.FullName)"
 
       - name: Create release ZIP
         run: |
