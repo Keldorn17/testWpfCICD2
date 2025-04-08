@@ -102,7 +102,7 @@ jobs:
           
           # Commit and push
           git add ${{ env.PROJECT_PATH }}
-          git commit -m "Bump version to $NEW_VERSION [skip ci]"
+          git commit -m "Bump version to $NEW_VERSION"
           git push origin version-update-$NEW_VERSION
           
           # Create and push tag
