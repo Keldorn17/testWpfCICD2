@@ -31,19 +31,19 @@ jobs:
   
       - name: Publish the application (Full Release)
         run: |
-          dotnet publish ${{ env.PROJECT_PATH }} \
-            -c Release \
-            -r win-x64 \
-            --self-contained true \
-            -p:PublishSingleFile=false \
-            -p:IncludeAllContentForSelfExtract=false \
-            -p:EnableCompressionInSingleFile=true \
-            --no-build \
+          dotnet publish ${{ env.PROJECT_PATH }} `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            -p:PublishSingleFile=false `
+            -p:IncludeAllContentForSelfExtract=false `
+            -p:EnableCompressionInSingleFile=true `
+            --no-build `
             -o publish_output
 
       - name: Zip the output
         run: |
-          Compress-Archive -Path publish_output/* -DestinationPath TODO_Release.zip -Force
+          Compress-Archive -Path publish_output\* -DestinationPath TODO_Release.zip -Force
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
