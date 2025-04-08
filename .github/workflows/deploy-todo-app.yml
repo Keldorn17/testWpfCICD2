@@ -4,34 +4,12 @@ on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
 
 env:
   PROJECT_PATH: TODO.csproj
 
 jobs:
-  verify-build:
-    if: github.event_name == 'pull_request'
-    runs-on: windows-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-  
-      - name: Setup .NET 8
-        uses: actions/setup-dotnet@v3
-        with:
-          dotnet-version: '8.0.x'
-
-      - name: Restore dependencies
-        run: dotnet restore ${{ env.PROJECT_PATH }} -r win-x64
-  
-      - name: Build the application
-        run: dotnet build ${{ env.PROJECT_PATH }} -c Release --no-restore
-
   deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: windows-latest
     steps:
       - name: Checkout repository
@@ -72,14 +50,13 @@ jobs:
 
   create-release:
     needs: deploy
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}  # Needed for branch deletion
 
       - name: Get current version
         id: get_version
@@ -98,12 +75,21 @@ jobs:
           NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
           echo "TAG_NAME=todo/v$NEW_VERSION" >> $GITHUB_ENV
-          echo "TEMP_BRANCH=version-update-$NEW_VERSION" >> $GITHUB_ENV
+
+      - name: Check if tag exists
+        id: check_tag
+        run: |
+          if git rev-parse $TAG_NAME >/dev/null 2>&1; then
+            echo "SKIP_RELEASE=true" >> $GITHUB_ENV
+          else
+            echo "SKIP_RELEASE=false" >> $GITHUB_ENV
+          fi
 
       - name: Update version and create tag
+        if: env.SKIP_RELEASE == 'false'
         run: |
-          # Create temporary branch
-          git checkout -b $TEMP_BRANCH
+          # Checkout properly to a branch
+          git checkout -b version-update-$NEW_VERSION
           
           # Update version
           sed -i "s/<Version>.*<\/Version>/<Version>$NEW_VERSION<\/Version>/" ${{ env.PROJECT_PATH }}
@@ -115,19 +101,21 @@ jobs:
           # Commit and push
           git add ${{ env.PROJECT_PATH }}
           git commit -m "Bump version to $NEW_VERSION [skip ci]"
-          git push origin $TEMP_BRANCH
+          git push origin version-update-$NEW_VERSION
           
           # Create and push tag
           git tag $TAG_NAME
           git push origin $TAG_NAME
 
       - name: Download artifact
+        if: env.SKIP_RELEASE == 'false'
         uses: actions/download-artifact@v4
         with:
           name: release-package
           path: release
 
       - name: Create Release
+        if: env.SKIP_RELEASE == 'false'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.TAG_NAME }}
@@ -136,11 +124,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Delete temporary branch
-        run: |
-          # Delete remote branch
-          git push origin --delete $TEMP_BRANCH
-          
-          # Delete local branch
-          git checkout main
-          git branch -D $TEMP_BRANCH
+      - name: Skip release notice
+        if: env.SKIP_RELEASE == 'true'
+        run: echo "Skipping release as tag $TAG_NAME already exists"
