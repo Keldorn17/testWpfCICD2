@@ -1,57 +1,27 @@
-name: "Auto-Create Version PR"
+name: Auto PR for version updates
 
 on:
-  workflow_run:
-    workflows: ["Deploy Todo App"]
-    types:
-      - completed
+  create:
+
+permissions:
+  contents: write
+  pull-requests: write
 
 jobs:
-  create-version-pr:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+  auto-pr:
+    if: startsWith(github.ref_name, 'version-update-')
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          ref: main
-          fetch-depth: 0
+        uses: actions/checkout@v3
 
-      - name: Find version-update branch
-        id: find_branch
-        run: |
-          # Fetch all remote branches
-          git fetch --all
-          # Find the most recent version-update branch
-          BRANCH_NAME=$(git branch -r | grep 'origin/version-update-' | sort -r | head -1 | sed 's/origin\///' | tr -d ' ')
-          if [ -z "$BRANCH_NAME" ]; then
-            echo "No version-update branch found"
-            exit 0
-          fi
-          echo "branch_name=${BRANCH_NAME}" >> $GITHUB_OUTPUT
-          echo "Found branch: ${BRANCH_NAME}"
-
-      - name: Fetch required branches
-        if: steps.find_branch.outputs.branch_name != ''
-        run: |
-          git fetch origin main
-          git fetch origin ${{ steps.find_branch.outputs.branch_name }}
-
-      - name: Create Pull Request
-        if: steps.find_branch.outputs.branch_name != ''
+      - name: Create pull request
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          path: .
-          branch: ${{ steps.find_branch.outputs.branch_name }}
-          base: main
-          title: "Version bump $(date +'%Y-%m-%d')"
-          body: "Automated version update"
-          labels: "automated"
-          commit-message: "Version bump $(date +'%Y-%m-%d')"
-          delete-branch: false
+          branch: ${{ github.ref_name }}
+          base: main  # Change if needed
+          title: "Auto PR for ${{ github.ref_name }}"
+          body: "This PR was automatically created for the version update branch: ${{ github.ref_name }}."
           draft: false
