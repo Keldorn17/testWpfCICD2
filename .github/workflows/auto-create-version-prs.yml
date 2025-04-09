@@ -19,9 +19,9 @@ jobs:
       - name: Create pull request
         uses: peter-evans/create-pull-request@v5
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.PERSONAL_TOKEN }}
           branch: ${{ github.ref_name }}
-          base: main  # Change if needed
+          base: main
           title: "Auto PR for ${{ github.ref_name }}"
-          body: "This PR was automatically created for the version update branch: ${{ github.ref_name }}."
+          body: "Automatically created for the version update branch: ${{ github.ref_name }}."
           draft: false
