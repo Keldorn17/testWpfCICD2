@@ -4,8 +4,6 @@ on:
   pull_request:
     types: [opened, reopened, synchronize]
     branches: [main]
-    paths:
-      - 'TODO.csproj'
 
 jobs:
   approve-and-merge:
@@ -23,6 +21,13 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
+
+      - name: Debug PR info
+        run: |
+          echo "PR Number: ${{ github.event.pull_request.number }}"
+          echo "Head Ref: ${{ github.event.pull_request.head.ref }}"
+          echo "Base Ref: ${{ github.event.pull_request.base.ref }}"
+          echo "Node ID: ${{ github.event.pull_request.node_id }}"
 
       - name: Configure Git
         run: |
