@@ -51,4 +51,4 @@ jobs:
             -t "Version Update: ${{ steps.find_branch.outputs.branch_name }}" \
             -b "Automated version bump created by GitHub Actions"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
