@@ -28,8 +28,18 @@ jobs:
           git fetch --all
           # Find the most recent version-update branch
           BRANCH_NAME=$(git branch -r | grep 'origin/version-update-' | sort -r | head -1 | sed 's/origin\///' | tr -d ' ')
+          if [ -z "$BRANCH_NAME" ]; then
+            echo "No version-update branch found"
+            exit 0
+          fi
           echo "branch_name=${BRANCH_NAME}" >> $GITHUB_OUTPUT
           echo "Found branch: ${BRANCH_NAME}"
+
+      - name: Fetch main branch explicitly
+        if: steps.find_branch.outputs.branch_name != ''
+        run: |
+          git fetch origin main:main
+          git branch -a  # For debugging
 
       - name: Create Pull Request
         if: steps.find_branch.outputs.branch_name != ''

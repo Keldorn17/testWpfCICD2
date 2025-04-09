@@ -40,6 +40,10 @@ jobs:
               core.setFailed(error.message)
             }
 
+      - name: Brief safety delay
+        run: sleep 10
+        if: always()
+
       - name: Enable auto-merge
         uses: actions/github-script@v7
         with:
