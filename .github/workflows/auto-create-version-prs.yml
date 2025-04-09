@@ -35,11 +35,11 @@ jobs:
           echo "branch_name=${BRANCH_NAME}" >> $GITHUB_OUTPUT
           echo "Found branch: ${BRANCH_NAME}"
 
-      - name: Fetch main branch explicitly
+      - name: Fetch required branches
         if: steps.find_branch.outputs.branch_name != ''
         run: |
-          git fetch origin main:main
-          git branch -a  # For debugging
+          git fetch origin main
+          git fetch origin ${{ steps.find_branch.outputs.branch_name }}
 
       - name: Create Pull Request
         if: steps.find_branch.outputs.branch_name != ''
