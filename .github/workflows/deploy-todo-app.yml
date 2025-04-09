@@ -10,6 +10,7 @@ env:
 
 jobs:
   deploy:
+    if: ${{ !contains(github.ref, 'version-update') }}
     runs-on: windows-latest
     steps:
       - name: Checkout repository
