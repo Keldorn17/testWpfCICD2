@@ -49,7 +49,6 @@ jobs:
             -B main \
             -H "${{ steps.find_branch.outputs.branch_name }}" \
             -t "Version Update: ${{ steps.find_branch.outputs.branch_name }}" \
-            -b "Automated version bump created by GitHub Actions" \
-            -l "automated"
+            -b "Automated version bump created by GitHub Actions"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
