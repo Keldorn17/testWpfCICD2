@@ -1,11 +1,15 @@
 name: Auto PR for version updates
 
 on:
-  create: # Triggers when a new branch or tag is created
+  create:
+
+permissions:
+  contents: write
+  pull-requests: write
 
 jobs:
   auto-pr:
-    if: startsWith(github.ref_name, 'version-update-') # Only run if branch starts with that prefix
+    if: startsWith(github.ref_name, 'version-update-')
     runs-on: ubuntu-latest
 
     steps:
@@ -17,7 +21,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: ${{ github.ref_name }}
-          base: main  # Change if your default branch is different
+          base: main  # Change if needed
           title: "Auto PR for ${{ github.ref_name }}"
           body: "This PR was automatically created for the version update branch: ${{ github.ref_name }}."
           draft: false
