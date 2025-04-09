@@ -94,25 +94,62 @@ jobs:
           git add ${{ env.PROJECT_PATH }}
           git commit -m "Bump version to $NEW_VERSION"
           git push origin version-update-$NEW_VERSION
-
-      - name: Create Pull Request
-        if: env.SKIP_RELEASE == 'false'
-        uses: peter-evans/create-pull-request@v5
-        with:
-          branch: "version-update-$NEW_VERSION"
-          base: main
-          title: "Version update: $NEW_VERSION"
-          body: "Automated version bump after release"
-          labels: "automated"
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Auto-merge PR
+          echo "BRANCH_NAME=version-update-$NEW_VERSION" >> $GITHUB_ENV
+          - name: Verify branch exists
+          if: env.SKIP_RELEASE == 'false'
+          run: |
+            git fetch
+            git checkout $BRANCH_NAME
+            echo "Branch exists and contains:"
+            cat ${{ env.PROJECT_PATH }}
+        
+      - name: Create Pull Request (with error handling)
+        id: create-pr
         if: env.SKIP_RELEASE == 'false'
         run: |
-          gh pr merge --auto --merge "$PR_URL"
+          echo "Attempting to create PR for branch $BRANCH_NAME"
+            
+          # First try with create-pull-request action
+          PR_URL=$(gh pr create \
+            --head "$BRANCH_NAME" \
+            --base "main" \
+            --title "Version update: $NEW_VERSION" \
+            --body "Automated version bump" \
+            --label "automated" 2>&1 || true)
+            
+          if [[ $PR_URL == *"pull request create failed"* ]]; then
+            echo "PR creation failed, trying alternative method..."
+            PR_JSON=$(gh api -X POST /repos/$GITHUB_REPOSITORY/pulls \
+              -f head="$BRANCH_NAME" \
+              -f base="main" \
+              -f title="Version update: $NEW_VERSION" \
+              -f body="Automated version bump")
+            PR_URL=$(echo "$PR_JSON" | jq -r '.html_url')
+          fi
+            
+          if [ -z "$PR_URL" ]; then
+            echo "::error::Failed to create PR"
+            exit 1
+          fi
+            
+          echo "Created PR: $PR_URL"
+          echo "pr_url=$PR_URL" >> $GITHUB_OUTPUT
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_URL: ${{ steps.create-pr.outputs.pull-request-url }}
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
+        
+
+      - name: Approve PR
+        if: env.SKIP_RELEASE == 'false'
+        run: |
+          gh pr review ${{ steps.create-pr.outputs.pull-request-number }} --approve
+        env:
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
+        
+      - name: Auto-Merge PR
+        run: |
+          gh pr merge ${{ steps.create-pr.outputs.pull-request-number }} --squash --auto
+        env:
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
 
       - name: Create and push tag
         if: env.SKIP_RELEASE == 'false'
